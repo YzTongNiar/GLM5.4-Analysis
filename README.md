@@ -14,6 +14,11 @@
 
 **[单页洞察 PPT：LoopFill 投机推理流程](reports/loopfill-speculative-decoding.html)**
 
+LoopFill 单篇导读：
+
+- [Markdown 导读](reports/loopfill-reading-guide.md)：按问题、方法、理论、实验和局限逐层阅读。
+- [交互式 HTML 导读](assets/loopfill-interactive-guide.html)：下载后用浏览器打开，支持流水线逐拍演示、双草稿树切换、理论计算和实验对比。
+
 建议按以下顺序阅读：
 
 1. 背景与统一问题框架；
@@ -29,6 +34,7 @@ GLM5.4-Analysis/
 ├── README.md
 ├── reports/
 │   ├── looped-transformer-decoding-analysis.md
+│   ├── loopfill-reading-guide.md
 │   └── loopfill-speculative-decoding.html
 ├── papers/
 │   ├── 2609.17184v1_LoopSpec.pdf
@@ -37,7 +43,10 @@ GLM5.4-Analysis/
 ├── assets/
 │   ├── loop-decoding-comparison.png
 │   ├── loop-decoding-comparison.html
+│   ├── loopfill-interactive-guide.html
 │   └── loopfill-speculative-decoding.png
+├── apps/
+│   └── loopfill-guide/（交互导读源码）
 └── diagrams/
     ├── loop-decoding-comparison.json
     ├── loopfill-speculative-decoding.json
