@@ -194,19 +194,27 @@ LAD 使用最近 $w$ 个位置的浅层目标状态：
 H_t^{(r)}=[h_{t-w+1}^{(r)},\ldots,h_t^{(r)}]
 ```
 
-以及目标模型在浅层产生的原生 Anchor $a_t$。Anchor 不需要先通过完整深度验证，其 embedding 用于告诉 LAD 从哪个候选 Token 后继续预测。
+以及目标模型在浅层产生的原生 Anchor $a_t$：
+
+```math
+a_t=\underset{v\in\mathcal V_{\mathrm{tgt}}}{\arg\max}\,[W_{\mathrm{out}}h_t^{(r)}]_v
+```
+
+其中 $W_{\mathrm{out}}$ 是冻结的目标词汇表投影，$\mathcal V_{\mathrm{tgt}}$ 是完整目标词表。Anchor 不需要先通过完整深度验证，其 embedding 用于告诉 LAD 从哪个候选 Token 后继续预测。
 
 LAD 将上下文投影到较小隐藏空间，为未来位置添加 query。每个 query 融合 Anchor embedding、最新上下文和位置编码，再由轻量因果 Transformer 一次前向计算多个未来位置：
 
 ```math
-\widehat h_{t,j}=h_t^{(r)}+D_{\phi,j}(H_t^{(r)},E(a_t))
+\widehat h_{t,j}=h_t^{(r)}+D_{\phi,j}(H_t^{(r)},E(a_t)),\qquad j=1,\ldots,K
 ```
 
 随后复用冻结的目标词汇表投影：
 
 ```math
-q_{\phi,j}=\operatorname{softmax}(W_{\mathrm{out}}\widehat h_{t,j})
+q_{\phi,j}=\operatorname{softmax}(W_{\mathrm{out}}\widehat h_{t,j}),\qquad j=1,\ldots,K
 ```
+
+其中 $q_{\phi,j}$ 是未来位置 $t+j$ 的草稿分布，$K$ 是单次 LAD 调用额外预测的 Token 数。
 
 基础 LAD 为两层、隐藏维度 512 的 Transformer。训练最多监督 7 个未来位置；部署时使用更短扩展，Ouro 和 Raven-TinyLlama 每次增加 3 个 Token，Raven-Llama／OLMo 增加 2 个。
 
@@ -231,29 +239,31 @@ q_{\phi,j}=\operatorname{softmax}(W_{\mathrm{out}}\widehat h_{t,j})
 
 ### 4.5 具体示例：代码生成中的 LAD 起草与冲突暂停
 
-以下使用论文 MBPP 案例中的局部片段做机制化简。已验证前缀为：
+以下对论文表 9 的 MBPP 案例做机制化简。原案例的输出为：
 
-```text
-... == 0 for
+```python
+return [t for t in tuples if all(i % k == 0 for i in t)]
 ```
 
-目标续写为 `i in t`。设 Ouro 使用 R4 完整验证、R1 起草、R2 中间反馈。LAD 根据浅层上下文和 Anchor 提前给出 `i → in → lst`，其中 `lst` 是错误候选，完整深度模型最终会把它纠正为 `t`。
+这里只考察局部续写：根节点代表已验证到 `... == 0` 的前缀，接下来的正确 Token 序列是 `for i in t`。
+
+设 Ouro 使用 R4 完整验证、R1 起草、R2 中间反馈。R1 首先在根节点产生尚未验证的原生 Anchor `for`；以该 Anchor 为条件，LAD 再一次提出 `i`、`in`、`lst` 三个候选，形成 `for（原生 Anchor）→ i → in → lst` 的候选链。其中 `i`、`in` 与目标一致，`lst` 是错误候选，完整深度模型最终会把它纠正为 `t`。
 
 为突出调度机制，下表假设各活跃节点每步推进一层，并省略其他候选、递归扩展和预算细节；它不是对完整请求的逐步复现。
 
 | 循环步 | 目标模型与候选节点 | 中层反馈与调度 | 验证／提交结果 |
 |---|---|---|---|
-| 1 | 根节点到 R1，产生原生 Anchor `i`；LAD 继续预测 `in`、`lst` | 建立 `i → in → lst` 候选链，后续节点开始提前计算 | 尚无输出 |
-| 2 | 根节点到 R2；`i`、`in`、`lst` 到 R1 | 根的反馈仍支持 `i`，候选链继续执行 | 尚无输出 |
-| 3 | 根节点到 R3；`i`、`in` 到 R2 | `in` 的反馈倾向 `t`，与 `lst` 冲突；暂停 `lst`，但保留其状态 | 尚无输出 |
-| 4 | 根节点到 R4，确认输出 `i`；`i`、`in` 到 R3 | 保留匹配路径，错误后缀继续暂停 | 提交 `i`，`i` 节点成为新根 |
-| 5 | `i` 到 R4并确认 `in`；`in` 也已到 R4并确认 `t` | 保留 `in` 的计算，剪除 `lst`；为纠正 Token `t` 创建正确分支 | 同一步依次提交 `in` 和 `t` |
+| 1 | 根节点到 R1，产生原生 Anchor `for`；LAD 继续预测 `i`、`in`、`lst` | 建立 `for → i → in → lst` 候选链，后续节点开始提前计算 | 尚无输出 |
+| 2 | 根节点到 R2；`for`、`i`、`in`、`lst` 到 R1 | 根的反馈仍支持 `for`，候选链继续执行 | 尚无输出 |
+| 3 | 根节点到 R3；`for`、`i`、`in` 到 R2 | `in` 的反馈倾向 `t`，与 `lst` 冲突；暂停 `lst`，但保留其状态 | 尚无输出 |
+| 4 | 根节点到 R4，确认输出 `for`；`for`、`i`、`in` 到 R3 | 保留匹配路径，错误后缀继续暂停 | 提交 `for`，`for` 节点成为新根 |
+| 5 | `for` 到 R4并确认 `i`；`i` 到 R4并确认 `in`；`in` 也到 R4并确认 `t` | 保留 `for → i → in` 的计算，剪除 `lst`；为纠正 Token `t` 创建正确分支 | 同一步依次提交 `i`、`in` 和 `t` |
 
 这个例子体现了 LoopAhead 的三个关键动作：
 
-1. **LAD 提前铺长**：`in` 等未来 Token 在当前根节点验证前就已开始计算；
+1. **LAD 提前铺长**：`i`、`in` 等未来 Token 在当前根节点验证前就已开始计算；
 2. **中层反馈节省计算**：`lst` 在完整深度验证前就被暂停，避免继续浪费循环；
-3. **完整深度纠正并复用**：最终输出 `t` 而非错误的 `lst`，但正确的 `i`、`in` 分支计算仍被保留。
+3. **完整深度纠正并复用**：最终输出 `for i in t` 而非以 `lst` 结尾，但正确的 `for`、`i`、`in` 分支计算仍被保留。
 
 论文对应的完整 MBPP 案例中，LoopSpec 使用 40 个循环、耗时 269.7 ms；LoopAhead 使用 23 个循环、耗时 185.8 ms，吞吐量提高 45.2%，且两种方法产生相同输出。
 
@@ -308,15 +318,16 @@ LoopSpec 的逐 Token 提案受浅层深度和拒绝重启限制；普通 Suffix
 后缀边的初始权重为：
 
 ```math
-w(v)=\min(1,cq(v))
+w(v)=\min\{1,cq(v)\}
 ```
 
-其中 $q(v)$ 是历史续写频率，参数 `c` 控制后缀草稿相对权重。浅层预测后，top-k 子节点使用模型概率，其余候选权重置零。
+其中 $q(v)$ 是在父节点的历史匹配中继续经过子节点 $v$ 的频率，参数 $c$ 控制后缀草稿相对权重。浅层预测后，top-k 子节点使用模型概率，其余候选权重置零。
 
-节点路径分数为：
+任意非根节点 $v$ 的路径分数按从根到该节点的边权重连乘计算，根节点初始分数为 1：
 
 ```math
-s(v)=s(\operatorname{parent}(v))w(v)
+s(\mathrm{root})=1,\qquad
+s(v)=s(\operatorname{parent}(v))\,w(v)
 ```
 
 每轮重新排序并保留最多 $N$ 个非根节点，默认 $N=16$。父节点优先于子节点，因此保留一个节点时，其到根的完整路径也会保留。每个请求每步最多占用 $N+1$ 个计算位置，避免无限草稿挤占其他请求。
