@@ -14,7 +14,7 @@ Looped Transformer 通过反复应用共享 Transformer block，在较少参数�
 - **LoopAhead** 训练轻量级 LookAhead Drafter（LAD），根据浅层上下文和原生 Anchor 一次预测多个未来 Token，再利用中间层反馈暂停、恢复和执行候选分支。
 - **LoopFill** 将后缀树检索的多 Token 草稿与浅层原生预测合并到统一草稿树，通过路径评分和 Top-N 预算控制计算，无需额外训练。
 
-本报告逐篇分析其方法，并用 `France／Paris` 示例说明 LoopSpec 的完整调度过程。最后补充辨析另一篇同名 LoopAhead：该方法采用“预测深层输入＋并行计算＋输出校正”，与多 Token 投机解码的 LoopAhead 不是同一工作。
+本报告逐篇分析其方法，并通过具体表格示例说明 LoopSpec 的双提案流水线、LoopAhead 的 LAD 起草与冲突暂停，以及 LoopFill 的双草稿源协同与连续 Token 提交。
 
 ---
 
@@ -412,35 +412,7 @@ to join Lean Club \n
 
 ---
 
-## 7. 同名 LoopAhead 辨析：预测器与校正器方法
-
-补充论文：[LoopAhead: Parallelizing Recurrent Depth in Looped Transformers](../papers/33690_LoopAhead_Parallelling_R.pdf)。
-
-这篇论文与第 4 节的 LoopAhead 同名，但研究对象不同。它不是生成未来 Token 的投机解码，而是并行化**同一个 Token 前缀的不同循环深度**。
-
-其流程为：
-
-1. 计算 $H^1=F(H^0)$，得到 $V^1=H^1-H^0$；
-2. 用预测器 $J_{\mathrm{pred}}$ 外推后续循环的临时输入；
-3. 将真实浅层状态与猜测深层状态放入同一 batch；
-4. 用校正器 $J_{\mathrm{corr}}$ 根据浅层输入的新旧差异修正深层输出；
-5. 最深的校正状态用于下一 Token 预测。
-
-例如 $1+3+3$ 调度以 3 个顺序阶段达到目标深度索引 $D=5$，但需要 7 次 backbone evaluation，而普通模型是 5 次 evaluation、5 个顺序阶段。它用更多并行 FLOPs 换取更短顺序路径，并且需要联合训练 backbone、预测器和校正器。
-
-| 维度 | 本报告的 LoopAhead 基线 | 同名 Parallelizing Recurrent Depth |
-|---|---|---|
-| 并行对象 | 不同未来 Token 与循环深度 | 同一前缀的不同循环深度 |
-| 核心组件 | LAD＋反馈调度器 | Predictor＋Corrector |
-| 是否投机 Token | 是 | 否 |
-| 是否完整深度验证 | 是 | 无草稿验证概念 |
-| 是否保持原顺序模型输出 | 是，无损验证 | 不保证，学习新的并行计算轨迹 |
-
-引用或复现 “LoopAhead” 时，必须先确认论文标题和方法来源，避免把两篇工作混为一谈。
-
----
-
-## 8. 总结
+## 7. 总结
 
 三种投机解码方法可以统一理解为：**利用浅层或历史信息提前组织未来计算，再由完整深度模型进行无损验证。**
 
@@ -457,7 +429,6 @@ to join Lean Club \n
 1. Cho, S., Cui, L., Kim, S., Han, D., & Han, I. **LoopSpec: Pipelined Self-Speculative Decoding for Looped Transformers**. arXiv:2609.17184v1, 2026. [本地论文](../papers/2609.17184v1_LoopSpec.pdf)；[arXiv](https://arxiv.org/abs/2609.17184)。
 2. Liu, Z., Xue, N., Bao, R., Xu, Y., Cao, X., Yao, J., & Chen, Z. **LoopAhead: Speculating Ahead for Faster Decoding in Looped Language Models**. arXiv:2610.21594v1, 2026. [本地论文](../papers/2610.21594v1_LoopAhead.pdf)；[arXiv](https://arxiv.org/abs/2610.21594)。
 3. Zhu, S., Huang, S., Zhao, Y., & You, J. **LoopFill: Pipelined Multi-Token Speculative Decoding for Looped Transformers**. arXiv:2611.19649v1, 2026. [本地论文](../papers/2611.19649v1_LoopFill.pdf)；[arXiv](https://arxiv.org/abs/2611.19649)。
-4. Anonymous. **LoopAhead: Parallelizing Recurrent Depth in Looped Transformers**. ICLR 2027 审稿稿件，用户提供的本地文件。[本地论文](../papers/33690_LoopAhead_Parallelling_R.pdf)。
 
 ## 附录 B：常见符号
 
