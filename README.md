@@ -12,6 +12,8 @@
 
 **[中文分析报告：Looped Transformer 投机解码方法分析](reports/looped-transformer-decoding-analysis.md)**
 
+**[单页洞察 PPT：LoopFill 投机推理流程](reports/loopfill-speculative-decoding.html)**
+
 建议按以下顺序阅读：
 
 1. 背景与统一问题框架；
@@ -26,22 +28,27 @@
 GLM5.4-Analysis/
 ├── README.md
 ├── reports/
-│   └── looped-transformer-decoding-analysis.md
+│   ├── looped-transformer-decoding-analysis.md
+│   └── loopfill-speculative-decoding.html
 ├── papers/
 │   ├── 2609.17184v1_LoopSpec.pdf
 │   ├── 2610.21594v1_LoopAhead.pdf
 │   └── 2611.19649v1_LoopFill.pdf
 ├── assets/
 │   ├── loop-decoding-comparison.png
-│   └── loop-decoding-comparison.html
+│   ├── loop-decoding-comparison.html
+│   └── loopfill-speculative-decoding.png
 └── diagrams/
-    └── loop-decoding-comparison.json
+    ├── loop-decoding-comparison.json
+    ├── loopfill-speculative-decoding.json
+    ├── loopfill-speculative-decoding.svg
+    └── loopfill-speculative-decoding.drawio
 ```
 
 - `papers/`：原始论文，仅用于学习与研究，版权归原作者及出版方所有。
-- `reports/`：中文分析报告，包含公式、流程，以及三种方法的具体表格实例。
-- `assets/`：方法对比图；HTML 文件下载后可用浏览器打开，支持缩放与深浅色切换。
-- `diagrams/`：对比图的可编辑 JSON 源文件。
+- `reports/`：中文分析报告与自包含 HTML 洞察页。
+- `assets/`：方法对比图、页面预览图及交互式 HTML。
+- `diagrams/`：对比图与 LoopFill 结构图的可编辑源文件、SVG 和 draw.io。
 
 ## 核心结论
 

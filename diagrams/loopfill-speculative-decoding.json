@@ -1,0 +1,814 @@
+{
+  "title": "LoopFill speculative decoding workflow",
+  "width": 1164,
+  "height": 430,
+  "elements": [
+    {
+      "type": "rect",
+      "x": 15,
+      "y": 175,
+      "w": 120,
+      "h": 70,
+      "fill": "#F3F3F3",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 75.0,
+      "y": 204.475,
+      "text": "Verified\nPrefix",
+      "fs": 17,
+      "bold": true,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 190,
+      "y": 20,
+      "w": 215,
+      "h": 90,
+      "fill": "#EDF2F6",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 297.5,
+      "y": 50.99999999999999,
+      "text": "Local + Global Suffix Trees\nMulti-token drafts · Q = 4\nMatch up to 64 tokens",
+      "fs": 14,
+      "bold": false,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 190,
+      "y": 160,
+      "w": 215,
+      "h": 90,
+      "fill": "#F8EDEC",
+      "stroke": "#C00000",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 297.5,
+      "y": 189.0,
+      "text": "Unified Draft Tree\nShared-prefix merge\nBidirectional expansion",
+      "fs": 16,
+      "bold": true,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 450,
+      "y": 160,
+      "w": 170,
+      "h": 90,
+      "fill": "#FFFFFF",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 535.0,
+      "y": 191.0,
+      "text": "Path Scoring\ns(v) = s(parent)·w(v)\nKeep Top-N · N = 16",
+      "fs": 14,
+      "bold": false,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 665,
+      "y": 140,
+      "w": 220,
+      "h": 120,
+      "fill": "#EDF2F6",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 775.0,
+      "y": 174.875,
+      "text": "Shared Transformer Block\nOne batched pass\nDifferent tokens + depths\n≤ N+1 slots / request",
+      "fs": 15,
+      "bold": true,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 930,
+      "y": 140,
+      "w": 210,
+      "h": 120,
+      "fill": "#F8EDEC",
+      "stroke": "#C00000",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 1035.0,
+      "y": 184.0,
+      "text": "Full-depth Verification\nDepth T → Coda\nTarget distribution",
+      "fs": 16,
+      "bold": true,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 450,
+      "y": 315,
+      "w": 170,
+      "h": 80,
+      "fill": "#F8EDEC",
+      "stroke": "#C00000",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 535.0,
+      "y": 341.0,
+      "text": "Shallow Readout\nDepth d < T\nLM Head → Top-k = 2",
+      "fs": 14,
+      "bold": false,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 665,
+      "y": 315,
+      "w": 220,
+      "h": 80,
+      "fill": "#F3F3F3",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 775.0,
+      "y": 341.0,
+      "text": "Accept + Promote + Prune\nReuse H, KV, completed loops\nKeep descendant subtree",
+      "fs": 14,
+      "bold": false,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "rect",
+      "x": 930,
+      "y": 315,
+      "w": 210,
+      "h": 80,
+      "fill": "#F3F3F3",
+      "stroke": "#999999",
+      "sw": 0.9,
+      "dash": false,
+      "r": 1
+    },
+    {
+      "type": "text",
+      "x": 1035.0,
+      "y": 340.0,
+      "text": "Committed Tokens\nOne or more per step\nOutput distribution preserved",
+      "fs": 15,
+      "bold": true,
+      "color": "#1D1D1A",
+      "anchor": "middle"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          135,
+          210.0
+        ],
+        [
+          190,
+          205.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#777777",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          405,
+          205.0
+        ],
+        [
+          450,
+          205.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          620,
+          205.0
+        ],
+        [
+          665,
+          200.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#777777",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          885,
+          200.0
+        ],
+        [
+          930,
+          200.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          1035.0,
+          260
+        ],
+        [
+          1035.0,
+          315
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          75.0,
+          175
+        ],
+        [
+          75,
+          65
+        ],
+        [
+          190,
+          65.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#777777",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          297.5,
+          110
+        ],
+        [
+          297.5,
+          160
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#777777",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 310,
+      "y": 122,
+      "text": "frequency-weighted\ndrafts",
+      "fs": 12,
+      "bold": false,
+      "color": "#666666",
+      "anchor": "start"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          190,
+          205.0
+        ],
+        [
+          170,
+          205
+        ],
+        [
+          170,
+          65
+        ],
+        [
+          190,
+          65.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": true,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 162,
+      "y": 135,
+      "text": "re-query",
+      "fs": 12,
+      "bold": false,
+      "color": "#C00000",
+      "anchor": "end"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          775.0,
+          260
+        ],
+        [
+          775,
+          290
+        ],
+        [
+          535,
+          290
+        ],
+        [
+          535.0,
+          315
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": false,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 655,
+      "y": 283,
+      "text": "H(d)",
+      "fs": 13,
+      "bold": true,
+      "color": "#C00000",
+      "anchor": "middle"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          450,
+          355.0
+        ],
+        [
+          425,
+          355
+        ],
+        [
+          425,
+          290
+        ],
+        [
+          297,
+          290
+        ],
+        [
+          297.5,
+          250
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": true,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 360,
+      "y": 283,
+      "text": "Top-k candidates",
+      "fs": 12,
+      "bold": false,
+      "color": "#C00000",
+      "anchor": "middle"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          930,
+          200.0
+        ],
+        [
+          907,
+          200
+        ],
+        [
+          907,
+          355
+        ],
+        [
+          885,
+          355.0
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": true,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 899,
+      "y": 285,
+      "text": "match",
+      "fs": 12,
+      "bold": true,
+      "color": "#C00000",
+      "anchor": "end"
+    },
+    {
+      "type": "line",
+      "points": [
+        [
+          775.0,
+          395
+        ],
+        [
+          775,
+          418
+        ],
+        [
+          75,
+          418
+        ],
+        [
+          75.0,
+          245
+        ]
+      ],
+      "arrow": true,
+      "stroke": "#C00000",
+      "dash": true,
+      "sw": 1.1,
+      "fill": "none"
+    },
+    {
+      "type": "text",
+      "x": 425,
+      "y": 411,
+      "text": "next iteration: matched child becomes the new root",
+      "fs": 13,
+      "bold": false,
+      "color": "#C00000",
+      "anchor": "middle"
+    },
+    {
+      "type": "text",
+      "x": 18,
+      "y": 24,
+      "text": "DRAFT + EXPAND",
+      "fs": 13,
+      "bold": true,
+      "color": "#C00000",
+      "anchor": "start"
+    },
+    {
+      "type": "text",
+      "x": 450,
+      "y": 132,
+      "text": "SELECT",
+      "fs": 13,
+      "bold": true,
+      "color": "#666666",
+      "anchor": "start"
+    },
+    {
+      "type": "text",
+      "x": 665,
+      "y": 112,
+      "text": "PIPELINE",
+      "fs": 13,
+      "bold": true,
+      "color": "#666666",
+      "anchor": "start"
+    },
+    {
+      "type": "text",
+      "x": 930,
+      "y": 112,
+      "text": "VERIFY + COMMIT",
+      "fs": 13,
+      "bold": true,
+      "color": "#C00000",
+      "anchor": "start"
+    }
+  ],
+  "graph": {
+    "nodes": {
+      "prefix": {
+        "box": [
+          15,
+          175,
+          120,
+          70
+        ],
+        "role": "input",
+        "shape": "box",
+        "require_io": false
+      },
+      "suffix": {
+        "box": [
+          190,
+          20,
+          215,
+          90
+        ],
+        "role": "retrieval",
+        "shape": "box",
+        "require_io": false
+      },
+      "tree": {
+        "box": [
+          190,
+          160,
+          215,
+          90
+        ],
+        "role": "draft-tree",
+        "shape": "box",
+        "require_io": false
+      },
+      "score": {
+        "box": [
+          450,
+          160,
+          170,
+          90
+        ],
+        "role": "selection",
+        "shape": "box",
+        "require_io": false
+      },
+      "block": {
+        "box": [
+          665,
+          140,
+          220,
+          120
+        ],
+        "role": "compute",
+        "shape": "box",
+        "require_io": false
+      },
+      "verify": {
+        "box": [
+          930,
+          140,
+          210,
+          120
+        ],
+        "role": "verification",
+        "shape": "box",
+        "require_io": false
+      },
+      "shallow": {
+        "box": [
+          450,
+          315,
+          170,
+          80
+        ],
+        "role": "draft-readout",
+        "shape": "box",
+        "require_io": false
+      },
+      "reuse": {
+        "box": [
+          665,
+          315,
+          220,
+          80
+        ],
+        "role": "state-reuse",
+        "shape": "box",
+        "require_io": false
+      },
+      "output": {
+        "box": [
+          930,
+          315,
+          210,
+          80
+        ],
+        "role": "output",
+        "shape": "box",
+        "require_io": false
+      }
+    },
+    "edges": [
+      {
+        "source": "prefix",
+        "target": "tree",
+        "kind": "data",
+        "element": 18,
+        "source_port": "e",
+        "target_port": "w"
+      },
+      {
+        "source": "tree",
+        "target": "score",
+        "kind": "data",
+        "element": 19,
+        "source_port": "e",
+        "target_port": "w"
+      },
+      {
+        "source": "score",
+        "target": "block",
+        "kind": "data",
+        "element": 20,
+        "source_port": "e",
+        "target_port": "w"
+      },
+      {
+        "source": "block",
+        "target": "verify",
+        "kind": "data",
+        "element": 21,
+        "source_port": "e",
+        "target_port": "w"
+      },
+      {
+        "source": "verify",
+        "target": "output",
+        "kind": "data",
+        "element": 22,
+        "source_port": "s",
+        "target_port": "n"
+      },
+      {
+        "source": "prefix",
+        "target": "suffix",
+        "kind": "data",
+        "element": 23,
+        "source_port": "n",
+        "target_port": "w"
+      },
+      {
+        "source": "suffix",
+        "target": "tree",
+        "kind": "data",
+        "element": 24,
+        "source_port": "s",
+        "target_port": "n"
+      },
+      {
+        "source": "tree",
+        "target": "suffix",
+        "kind": "control",
+        "element": 26,
+        "source_port": "w",
+        "target_port": "w"
+      },
+      {
+        "source": "block",
+        "target": "shallow",
+        "kind": "data",
+        "element": 28,
+        "source_port": "s",
+        "target_port": "n"
+      },
+      {
+        "source": "shallow",
+        "target": "tree",
+        "kind": "control",
+        "element": 30,
+        "source_port": "w",
+        "target_port": "s"
+      },
+      {
+        "source": "verify",
+        "target": "reuse",
+        "kind": "control",
+        "element": 32,
+        "source_port": "w",
+        "target_port": "e"
+      },
+      {
+        "source": "reuse",
+        "target": "prefix",
+        "kind": "control",
+        "element": 34,
+        "source_port": "s",
+        "target_port": "s"
+      }
+    ],
+    "uses": []
+  },
+  "acceptance": {
+    "version": 1,
+    "kind": "workflow",
+    "required_nodes": [
+      "prefix",
+      "suffix",
+      "tree",
+      "score",
+      "block",
+      "shallow",
+      "verify",
+      "reuse",
+      "output"
+    ],
+    "paths": [
+      [
+        "prefix",
+        "tree",
+        "score",
+        "block",
+        "verify",
+        "output"
+      ],
+      [
+        "prefix",
+        "suffix",
+        "tree",
+        "score",
+        "block",
+        "shallow",
+        "tree"
+      ],
+      [
+        "block",
+        "verify",
+        "reuse",
+        "prefix",
+        "tree"
+      ]
+    ],
+    "zooms": [],
+    "reference": "LoopFill paper Figures 2–3 and Section 3; local Chinese guide Section 5. Redrawn as an end-to-end workflow with explicit feedback and state-reuse loops."
+  }
+}
