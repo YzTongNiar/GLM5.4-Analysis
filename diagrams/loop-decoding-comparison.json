@@ -1,0 +1,73 @@
+{
+  "schema_version": 2,
+  "diagram_type": "workflow",
+  "meta": {
+    "title": "LoopSpec、LoopAhead、LoopFill 解码方法对比",
+    "locale": "zh-CN",
+    "quality_profile": "showcase",
+    "viewBox": [1100, 534],
+    "output": "loop-decoding-comparison.html"
+  },
+  "lanes": [
+    { "id": "loopspec", "label": "LoopSpec｜浅层逐 Token 流水" },
+    { "id": "loopahead", "label": "LoopAhead｜学习型多 Token 草稿＋中层反馈" },
+    { "id": "loopfill", "label": "LoopFill｜免训练双草稿源＋统一树" }
+  ],
+  "phases": [
+    { "id": "drafting", "label": "① 草稿生成", "fromCol": 0, "toCol": 1, "variant": "emphasis" },
+    { "id": "pipeline", "label": "② 循环流水线", "fromCol": 2, "toCol": 3 },
+    { "id": "control", "label": "③ 分支控制", "fromCol": 4, "toCol": 4, "variant": "dashed" },
+    { "id": "verification", "label": "④ 完整深度验证", "fromCol": 5, "toCol": 5, "variant": "security" }
+  ],
+  "mainPath": ["lf-draft", "lf-tree", "lf-prune", "lf-verify"],
+  "semanticChecks": {
+    "allowedRoots": ["ls-draft", "la-draft", "lf-draft"],
+    "allowedTerminals": ["ls-verify", "la-verify", "lf-verify"]
+  },
+  "nodes": [
+    { "id": "ls-draft", "lane": "loopspec", "col": 0, "type": "backend", "label": "浅层原生预测", "sublabel": "每次提出下一 Token", "tag": "免训练", "width": 176 },
+    { "id": "ls-pipe", "lane": "loopspec", "col": 2, "type": "messagebus", "label": "单 Token 逐层入管", "sublabel": "前序节点先到起草深度", "width": 176 },
+    { "id": "ls-gate", "lane": "loopspec", "col": 4, "type": "security", "label": "更深层门控", "sublabel": "更新提案；错误时重启", "width": 176 },
+    { "id": "ls-verify", "lane": "loopspec", "col": 5, "type": "security", "label": "全深度决定输出", "sublabel": "接受匹配并复用状态", "width": 176 },
+
+    { "id": "la-draft", "lane": "loopahead", "col": 0, "type": "backend", "label": "LAD 多 Token 草稿", "sublabel": "浅层上下文＋原生 Anchor", "tag": "需训练", "width": 176 },
+    { "id": "la-tree", "lane": "loopahead", "col": 2, "type": "messagebus", "label": "候选树递归扩展", "sublabel": "未验证草稿也能继续起草", "width": 176 },
+    { "id": "la-feedback", "lane": "loopahead", "col": 4, "type": "security", "label": "中层反馈调度", "sublabel": "冲突暂停／恢复＋执行预算", "width": 176 },
+    { "id": "la-verify", "lane": "loopahead", "col": 5, "type": "security", "label": "全深度决定输出", "sublabel": "提交前缀并剪除竞争枝", "width": 176 },
+
+    { "id": "lf-draft", "lane": "loopfill", "col": 0, "type": "database", "label": "后缀树＋浅层预测", "sublabel": "检索多 Token；模型补草稿", "tag": "免训练", "width": 176 },
+    { "id": "lf-tree", "lane": "loopfill", "col": 2, "type": "messagebus", "label": "统一树双向扩展", "sublabel": "多 Token 同批跨深度推进", "width": 176 },
+    { "id": "lf-prune", "lane": "loopfill", "col": 4, "type": "security", "label": "路径分数＋Top-N", "sublabel": "频率×浅层概率控制预算", "width": 176 },
+    { "id": "lf-verify", "lane": "loopfill", "col": 5, "type": "security", "label": "全深度决定输出", "sublabel": "提升匹配子树为新根", "width": 176 }
+  ],
+  "edges": [
+    { "id": "ls-draft-pipe", "from": "ls-draft", "to": "ls-pipe", "label": "下一 Token", "variant": "default" },
+    { "id": "ls-pipe-gate", "from": "ls-pipe", "to": "ls-gate", "label": "异步推进", "variant": "default" },
+    { "id": "ls-gate-verify", "from": "ls-gate", "to": "ls-verify", "label": "最终验证", "variant": "emphasis" },
+
+    { "id": "la-draft-tree", "from": "la-draft", "to": "la-tree", "label": "一次起草 K 个", "variant": "default" },
+    { "id": "la-tree-feedback", "from": "la-tree", "to": "la-feedback", "label": "中间层读数", "variant": "default" },
+    { "id": "la-feedback-verify", "from": "la-feedback", "to": "la-verify", "label": "最终验证", "variant": "emphasis" },
+
+    { "id": "lf-draft-tree", "from": "lf-draft", "to": "lf-tree", "label": "合并同前缀节点", "variant": "emphasis" },
+    { "id": "lf-tree-prune", "from": "lf-tree", "to": "lf-prune", "label": "统一打分", "variant": "default" },
+    { "id": "lf-prune-verify", "from": "lf-prune", "to": "lf-verify", "label": "最终验证", "variant": "emphasis" }
+  ],
+  "cards": [
+    {
+      "dot": "cyan",
+      "title": "LoopSpec：最简洁",
+      "items": ["浅层逐 Token 起草，完全免训练", "新 Token 启动受浅层深度与拒绝重启限制"]
+    },
+    {
+      "dot": "violet",
+      "title": "LoopAhead：草稿与调度协同",
+      "items": ["LAD 提前铺长候选，中层反馈减少无效计算", "代价是模型相关训练与调度配置"]
+    },
+    {
+      "dot": "emerald",
+      "title": "LoopFill：检索与模型互补",
+      "items": ["后缀树立即铺长，浅层预测补检索缺口", "共同原则：草稿管调度，全深度管输出"]
+    }
+  ]
+}
