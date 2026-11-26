@@ -200,6 +200,8 @@ GLM-5.4 是 LoopFill 很合适的研究对象，因为它公开确认了共享�
 
 本节只解释 `kaist-flexml-lab/loopspec` 当前代码如何组织一次 LoopSpec 推理，不把这些实现改写成 LoopFill 方案。
 
+2026-11-26 复核：源码版本固定为 `41aa710ed7c9ce908cffa03597be5d1df19d7b56`。接受长度、投机步数和停止条件见第 9 节及[独立的 LoopSpec 实验洞察](loopspec-code-insights.md)。
+
 代码仓库：<https://github.com/kaist-flexml-lab/loopspec>
 
 ### 8.1 模型被明确拆成 `pre → recurrent → post`
@@ -212,19 +214,19 @@ LoopSpec 没有把完整模型简单复制成多个独立模型，而是把一�
 | `recurrent` | `OuroRecurrentExecutor` 或 `RavenRecurrentExecutor` | 共享的核心循环块 | 是，每个 lane 每个循环阶段执行 |
 | `post` | `PostExecutor` | Coda、最终归一化、LM Head、LogitsProcessor | 否，只在 q1、q2、final 读出点执行 |
 
-`RecurrentServingModel.forward()` 根据 `ForwardBatch.recurrent_role` 分派这三个角色。[`components.py` 的 `PreExecutor` 和 `PostExecutor`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/components.py#L49-L194) 只负责张量变换，循环调度和 KV 时间线由 LoopSpec runtime 管理。
+`RecurrentServingModel.forward()` 根据 `ForwardBatch.recurrent_role` 分派这三个角色。[`components.py` 的 `PreExecutor` 和 `PostExecutor`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/components.py#L49-L194) 只负责张量变换，循环调度和 KV 时间线由 LoopSpec runtime 管理。
 
-`LoopedRecurrentServingModel` 是固定深度基线。它先执行一次 `pre`，再执行 `recurrent_steps` 次共享核心块，最后执行一次 `post`。共享的 recurrent 模块不复制权重，而是通过重新编号 attention layer ID，让每次循环使用不同的逻辑 KV 层。[`serving.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/serving.py#L185-L240)
+`LoopedRecurrentServingModel` 是固定深度基线。它先执行一次 `pre`，再执行 `recurrent_steps` 次共享核心块，最后执行一次 `post`。共享的 recurrent 模块不复制权重，而是通过重新编号 attention layer ID，让每次循环使用不同的逻辑 KV 层。[`serving.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/serving.py#L185-L240)
 
 ### 8.2 Embedding 和 Prelude 的实际位置
 
 #### Ouro
 
-Ouro 的 `build_ouro()` 构造一个空的 `PreExecutor`，因此 Token 经过 `VocabParallelEmbedding` 后直接作为 recurrent hidden。每次 recurrent 迭代执行核心层并做 `step_norm`。Checkpoint 中的 `early_exit_gate` 会被加载并保留，但固定深度 serving 路径明确不会执行它。[`ouro.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/ouro.py#L88-L137)
+Ouro 的 `build_ouro()` 构造一个空的 `PreExecutor`，因此 Token 经过 `VocabParallelEmbedding` 后直接作为 recurrent hidden。每次 recurrent 迭代执行核心层并做 `step_norm`。Checkpoint 中的 `early_exit_gate` 会被加载并保留，但固定深度 serving 路径明确不会执行它。[`ouro.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/ouro.py#L88-L137)
 
 #### Raven
 
-Raven 的 `PreExecutor` 包含 Embedding 和 `n_layers_in_prelude` 个 Prelude block。Prelude 输出保存为 `state.injected`，同时根据 `init_std` 单独初始化 recurrent hidden。之后每个 recurrent 迭代都通过 adapter 拼接当前 hidden 和这份 injected Prelude 输出，再运行共享核心块。因此 Prelude 只计算一次，但它的结果会被每个循环迭代消费。[`raven.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/raven.py#L61-L100)
+Raven 的 `PreExecutor` 包含 Embedding 和 `n_layers_in_prelude` 个 Prelude block。Prelude 输出保存为 `state.injected`，同时根据 `init_std` 单独初始化 recurrent hidden。之后每个 recurrent 迭代都通过 adapter 拼接当前 hidden 和这份 injected Prelude 输出，再运行共享核心块。因此 Prelude 只计算一次，但它的结果会被每个循环迭代消费。[`raven.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/raven.py#L61-L100)
 
 需要区分两个概念。`raven_pre` 和 `olmo_post` 是 Raven 单层内部的归一化布局名称，`pre`、`recurrent`、`post` 才是 LoopSpec 的执行角色。
 
@@ -238,11 +240,11 @@ Ouro  -> recurrent_hidden = hidden
 Raven -> recurrent_hidden = 独立初始化值，injected = hidden
 ```
 
-所以 Embedding 并不在每个循环中重复，也没有按 Token ID 产生不同的矩阵乘法量。它只在一个新 lane 首次进入 `pre` 时执行一次。实际 LoopSpec server 还拒绝 `input_embeds`、多模态输入和 `replace_embeds` 路径，因此支持的 serving 路径使用普通 Token ID 查表。[`loopspec_scheduler.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/server/loopspec_scheduler.py#L51-L75) [`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/cuda_graph.py#L427-L444)
+所以 Embedding 并不在每个循环中重复，也没有按 Token ID 产生不同的矩阵乘法量。它只在一个新 lane 首次进入 `pre` 时执行一次。实际 LoopSpec server 还拒绝 `input_embeds`、多模态输入和 `replace_embeds` 路径，因此支持的 serving 路径使用普通 Token ID 查表。[`loopspec_scheduler.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/server/loopspec_scheduler.py#L51-L75) [`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/cuda_graph.py#L427-L444)
 
 ### 8.3 LM Head 不在 recurrent loop 内
 
-`PostExecutor.forward()` 先运行可选的 post blocks，再做 `final_norm`，最后调用 `LogitsProcessor(input_ids, hidden_states, lm_head, forward_batch)`。因此 LM Head 是 `post` 角色的一部分，不是共享 recurrent block 的一部分。[`components.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/components.py#L153-L194)
+`PostExecutor.forward()` 先运行可选的 post blocks，再做 `final_norm`，最后调用 `LogitsProcessor(input_ids, hidden_states, lm_head, forward_batch)`。因此 LM Head 是 `post` 角色的一部分，不是共享 recurrent block 的一部分。[`components.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/components.py#L153-L194)
 
 LoopSpec 的 `PipelineSchedule` 将循环阶段映射为三个端点：
 
@@ -252,7 +254,7 @@ K * X - 1   -> q2，可选第二提案
 S - 1       -> final，完整深度验证
 ```
 
-其中 `S` 是每个 Token 的总循环次数，`K` 是一个 pipeline cycle 推进的循环次数，`X` 是 q2 相对 q1 的深度倍率。[`pipeline.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/pipeline.py#L124-L170)
+其中 `S` 是每个 Token 的总循环次数，`K` 是一个 pipeline cycle 推进的循环次数，`X` 是 q2 相对 q1 的深度倍率。[`pipeline.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/pipeline.py#L124-L170)
 
 一次 `executor.forward(lanes)` 的顺序是：
 
@@ -261,7 +263,7 @@ S - 1       -> final，完整深度验证
 3. 只有本次结束阶段命中 q1、q2 或 final 的 lane 执行 `post`。
 4. `post` 输出交给决策策略。贪心模式在 GPU 上 `argmax`，只把 Token ID 回传 CPU。采样模式保存 q1/q2 概率分布，最后用完整分布执行接受和残差修正。
 
-[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/executor.py#L292-L367) [`decisions.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/decisions.py#L96-L177) [`sampling/policy.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/sampling/policy.py#L197-L304)
+[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/executor.py#L292-L367) [`decisions.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/decisions.py#L96-L177) [`sampling/policy.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/sampling/policy.py#L197-L304)
 
 这意味着 q1/q2 的 LM Head 不是“提前得到一个近似 logits 后跳过 final”，而是额外的中间读出。最终 Token 仍由 final endpoint 的完整深度 logits 决定。若 q1 或 q2 被接受，代码只复用已经推进的 lane 和其 KV 时间线。
 
@@ -269,13 +271,13 @@ S - 1       -> final，完整深度验证
 
 如果模型没有 post attention，`request.post()` 使用 attention-free direct graph，从 state bank 读取选中的 hidden，执行 Coda、norm 和 LM Head，不创建新的 KV timeline。
 
-如果模型存在 post attention，`request.post()` 会为每个 q1、q2、final 深度维护独立的 post cursor。prefill 阶段先为这些端点填充各自的 Prompt KV，decode 阶段只对端点 lane 推进 post cursor。[`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/request.py#L111-L192) [`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/request.py#L292-L323)
+如果模型存在 post attention，`request.post()` 会为每个 q1、q2、final 深度维护独立的 post cursor。prefill 阶段先为这些端点填充各自的 Prompt KV，decode 阶段只对端点 lane 推进 post cursor。[`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/request.py#L111-L192) [`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/request.py#L292-L322)
 
 因此：
 
-- Ouro 的 q1/q2 主要是 hidden state 到词表的读出和采样处理，post 为空，成本相对集中在 LM Head。
+- Ouro 的 q1/q2 主要是 hidden state 到词表的读出和采样处理；没有 Coda attention blocks，但 post 仍包含 final norm、LM Head 和 logits 处理。
 - Raven 的 q1/q2 可能还要执行 Coda 和 post attention，并为每个端点维护 KV 时间线。
-- 共享 Embedding 权重和 LM Head 权重只减少参数存储。`lm_head.tie_weights(embed_tokens)` 不会把 Embedding 查表和 LM Head 计算融合，也不会减少 endpoint 的词表投影次数。[`serving.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/modeling/serving.py#L146-L178)
+- 共享 Embedding 权重和 LM Head 权重只减少参数存储。`lm_head.tie_weights(embed_tokens)` 不会把 Embedding 查表和 LM Head 计算融合，也不会减少 endpoint 的词表投影次数。[`serving.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling/serving.py#L146-L178)
 
 ### 8.5 同一个 pipeline cycle 内为什么会出现位置和阶段负载不均
 
@@ -287,7 +289,7 @@ index  预测的 completion 序号
 token  当前作为输入的 Token
 ```
 
-`stage` 不是物理 layer ID，`index` 也不是循环深度。[`pipeline.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/pipeline.py#L13-L43)
+`stage` 不是物理 layer ID，`index` 也不是循环深度。[`pipeline.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/pipeline.py#L13-L43)
 
 设一个 cycle 开始时有 `B_t` 个 live lane，只有 `P_t` 个 lane 的 `stage == 0`，有 `E_t` 个 lane 在本次结束阶段命中 q1/q2/final。那么这个 cycle 的执行结构近似为：
 
@@ -304,19 +306,19 @@ post：     E_t 行，每行包含可选 Coda、norm、LM Head
 - 一个到达 final 的 lane，需要完整 post 和 LM Head。
 - 另一些到达普通阶段的 lane，不需要任何 post。
 
-代码不会把所有 lane 填充到同一个“大而全”的 forward。`_prepare_cycle()` 只把 `stage == 0` 的行放入 `pre_rows`，再用结束阶段筛选 `endpoints`。[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/executor.py#L205-L237)
+代码不会把所有 lane 填充到同一个“大而全”的 forward。`_prepare_cycle()` 只把 `stage == 0` 的行放入 `pre_rows`，再用结束阶段筛选 `endpoints`。[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/executor.py#L205-L237)
 
 这解决了角色之间的无效计算，却没有消除角色内部的全部负载不均。具体表现如下。
 
 #### 位置长度不均
 
-不同 lane 的 `index` 不同，所对应的 Token 位置和 prefix length 也不同。`DecodeStagingSlot.stage()` 为每行分别写入 `REQUEST`、`SEQUENCE_LENGTH`、`POSITION` 和 `TOKEN`。同一个 recurrent batch 内可以同时存在不同 `seq_len` 的 lane。[`metadata.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/metadata.py#L86-L137)
+不同 lane 的 `index` 不同，所对应的 Token 位置和 prefix length 也不同。`DecodeStagingSlot.stage()` 为每行分别写入 `REQUEST`、`SEQUENCE_LENGTH`、`POSITION` 和 `TOKEN`。同一个 recurrent batch 内可以同时存在不同 `seq_len` 的 lane。[`metadata.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/metadata.py#L86-L137)
 
-Attention backend 根据每行的 request mapping 和 sequence length 读取 KV。代码保留了这种 ragged metadata，但没有按照长度再分桶，也没有为短序列单独缩小 CUDA block。于是同一个 recurrent graph width 中，长 prefix 行会做更多 attention 访存，短 prefix 行可能先完成，形成 kernel 内部的尾部等待。
+Attention backend 根据每行的 request mapping 和 sequence length 读取 KV。LoopSpec 调度层保留这种 ragged metadata，但没有按长度再分桶。长度差异可能造成不同 attention 访存量；仅凭这一层代码不能判断底层 kernel 是否做了动态切分、block 调度，或尾部等待究竟有多大，后者需要检查具体 backend 并 profiling。
 
 #### Embedding 和 Prelude 的阶段不均
 
-Embedding 的成本属于 `P_t` 行，而 recurrent 的成本属于 `B_t` 行。新 lane 的数量随 q1/q2 接受情况变化，`P_t` 不是固定值。代码的处理方式是单独运行 pre role，而不是让所有 recurrent lane 再做一次 Embedding。对于没有 pre attention 的模型，pre 使用 direct graph，只有位置、Token 和 state-output slot 被上传，不建立 KV timeline。[`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/request.py#L241-L270)
+Embedding 的成本属于 `P_t` 行，而 recurrent 的成本属于 `B_t` 行。新 lane 的数量随 q1/q2 接受情况变化，`P_t` 不是固定值。代码的处理方式是单独运行 pre role，而不是让所有 recurrent lane 再做一次 Embedding。对于没有 pre attention 的模型，pre 使用 direct graph，只有位置、Token 和 state-output slot 被上传，不建立 KV timeline。[`request.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/request.py#L241-L270)
 
 这是一种角色级的负载隔离，不是位置级负载均衡。Embedding 查表本身不会因 Token ID 或位置产生不同 FLOPs，但新 lane 进入时间不同会让同一 cycle 的 pre batch 宽度波动。
 
@@ -324,17 +326,17 @@ Embedding 的成本属于 `P_t` 行，而 recurrent 的成本属于 `B_t` 行。
 
 LM Head 的成本属于 `E_t` 行。`post()` 只接收命中端点的 state slots，非端点 lane 不会执行 LM Head。q1、q2 和 final 在不同 cycle 到达，端点 batch 可能很小，尤其在 pipeline 启动和排空阶段。
 
-代码为 `pre`、`recurrent`、`post` 分别捕获不同 batch width 的 CUDA Graph，并把 graph key 写成 `(role, width, variant)`。`DecodeBatchPool` 也按角色和精确宽度复用 `ForwardBatch`。[`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/cuda_graph.py#L36-L121) [`batch_pool.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/batch_pool.py#L25-L186)
+代码为 `pre`、`recurrent`、`post` 分别捕获不同 batch width 的 CUDA Graph，并把 graph key 写成 `(role, width, variant)`。`DecodeBatchPool` 也按角色和精确宽度复用 `ForwardBatch`。[`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/cuda_graph.py#L36-L121) [`batch_pool.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/batch_pool.py#L25-L186)
 
-这避免了把一个小的 LM Head endpoint batch 强行 padding 到全部 live lane，也避免了 recurrent lane 被 post 角色拖慢。代价是需要预捕获多种 width，而且小 width 的词表投影和独立 graph launch 可能利用率较低。代码没有对 q1/q2/final 的 endpoint 做跨 cycle 合并，也没有让 LM Head 等待更多 lane 以换取更大的矩阵乘。
+这避免了把一个小的 LM Head endpoint batch 强行 padding 到全部 live lane，使非端点 lane 无需执行 post。但 post 仍在同一 cycle 内运行，决策回传后才进入下一轮调度，因此 LM Head 延迟仍会影响整个流水线。代价还包括预捕获多种 width，以及小 width 词表投影和独立 graph launch 可能利用率较低。代码没有对 q1/q2/final 的 endpoint 做跨 cycle 合并，也没有让 LM Head 等待更多 lane 以换取更大的矩阵乘。
 
 ### 8.6 分支和 KV 时间线如何保持这些不同位置的状态
 
-每个逻辑 branch 在 `pre`、每个 recurrent iteration 和每个 post endpoint 都有自己的 `TimelineCursor`。新 branch 不复制完整 K/V，而是先借用父 branch 的 prefix mapping，在第一次 graph replay 时复制映射并追加新的 KV slot。[`branching/manager.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/branching/manager.py#L45-L190)
+每个逻辑 branch 在 `pre`、每个 recurrent iteration 和每个 post endpoint 都有自己的 `TimelineCursor`。新 branch 不复制完整 K/V，而是先借用父 branch 的 prefix mapping，在第一次 graph replay 时复制映射并追加新的 KV slot。[`branching/manager.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/branching/manager.py#L45-L190)
 
-隐藏状态则由独立的 state bank 管理。`STATE_INPUT` 和 `STATE_OUTPUT` 只是 bank 行号，不能和 request-pool row 或 KV slot 混淆。recurrent 每次从指定 bank 行 gather hidden，执行一个循环后 scatter 回同一 lane 的 state slot。[`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/cuda_graph.py#L317-L359)
+隐藏状态则由独立的 state bank 管理。`STATE_INPUT` 和 `STATE_OUTPUT` 只是 bank 行号，不能和 request-pool row 或 KV slot 混淆。recurrent 每次从指定 bank 行 gather hidden，执行一个循环后 scatter 回同一 lane 的 state slot。[`cuda_graph.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/cuda_graph.py#L317-L359)
 
-这种设计把三种索引空间分开：
+这种设计把以下索引空间分开：
 
 | 索引空间 | 表示 | 作用 |
 |---|---|---|
@@ -354,14 +356,15 @@ LoopSpec 的负载处理可以分成三层。
 2. **端点稀疏化。** 只有 q1/q2/final 行执行 post，避免非读出阶段计算词表 logits。
 3. **精确宽度 Graph。** 对每个角色捕获多个 exact-width graph，避免用最大 live lane 数 padding 所有角色。
 
-它没有实现以下机制：
+在 LoopSpec 的 lane 调度层，没有实现以下机制：
 
 - 按 `seq_len` 或 `position` 对同一角色的 lane 再分桶。
 - 按 Token 的 Embedding、attention 或 LM Head 实际耗时做 work stealing。
 - 把多个 cycle 的小 endpoint batch 延迟合并成更大的词表矩阵乘。
-- 在 GPU kernel 内根据每行的上下文长度动态重新分配 block。
 
-所以，LoopSpec 解决的是**流水线阶段之间的结构性负载不均**，没有完全解决**同一阶段内部由序列长度和端点稀疏性造成的负载不均**。这也是它需要统计 `pre_rows`、`recurrent_rows`、`post_rows`、已验证 proposal 和拒绝数量的原因。[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/main/sglang_recurrent/loopspec/executor.py#L33-L45)
+底层 attention kernel 的 block 切分与调度不由以上结论覆盖。
+
+所以，LoopSpec 减少的是**流水线阶段之间的无效重复计算和 padding**，没有完全消除**同一阶段内部由序列长度和端点稀疏性造成的负载差异**。executor 内部维护 `pre_rows`、`recurrent_rows`、`post_rows`、已验证 proposal 和拒绝数量，可用于进一步分析；当前标准 `generation_metrics` 日志并未输出全部角色行数。[`executor.py`](https://github.com/kaist-flexml-lab/loopspec/blob/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/executor.py#L33-L45)
 
 ### 8.8 直接回答
 
@@ -369,12 +372,23 @@ LoopSpec 的负载处理可以分成三层。
 - **Prelude 和其他非循环部分怎么处理。** Embedding 和 Raven Prelude 属于 `pre`，每个新 lane 只执行一次。Raven 的 Prelude 输出作为 injected state 在每次 recurrent 迭代参与 adapter。Coda 和 final norm 属于 `post`，按端点重复执行。Ouro 没有 Prelude/Coda，`early_exit_gate` 在固定深度 serving 中不执行。
 - **Embedding 造成的同一 Loop 不同位置负载不均怎么处理。** 代码没有把 Embedding 放进 recurrent loop，因此不会在每个循环位置重复查表。新 lane 的 Embedding 由独立 pre batch 承担，旧 lane 继续执行 recurrent。不同序列位置造成的 attention 长度差异仍保留在同一 role batch 中，代码靠逐行 metadata 和 exact-width graph 管理，没有做长度级动态均衡。
 
+## 9. LoopSpec 的接受长度、投机步数与停止条件
+
+完整推导、源码固定链接和逐 cycle 示例见 [LoopSpec 实验洞察](loopspec-code-insights.md)。这里补齐原问题的直接答案：
+
+- **接受长度不是一次提交的 Token 数。** 当前 `continue_pipelined()` 每个 cycle 最多有一个 final lane，只提交一个 Token。报表使用 `accept_len = S·N / (A₁·K + A₂·d₂ + F·S)`：`N` 是不含 prefill 首 Token 的输出数，`A₁/A₂` 是 q1/q2 接受次数，`F` 是两者均未被接受的次数。它是按接受频数推算的等效长度，未计入有限序列的启动边界，也不是实际速度比。
+- **投机深度由模型和端点决定。** `S` 是每个 lane 的完整循环次数，`K=--first` 是每 cycle 的推进量，`d₂=--second` 是 q2 的绝对深度；内部 `X=d₂/K`。每个 lane 最多经历 `S/K` 个 cycle；没有一个独立的“起草 γ 个 Token 后统一停止验证”的参数。提案创建子 lane，父 lane 继续完整验证。
+- **接受只保留匹配来源的分支。** final 提交 Token 后，只复用父分支、Token 和 `origin_stage` 都匹配接受结果的子 lane 及其后代。所有提案被拒时，从最终回退 Token 建立新 lane；拒绝导致局部重启，不结束请求。
+- **正常结束只看已提交输出。** prefill 首 Token 及每次 final 提交后调用停止回调，检查输出预算和 SGLang 的 EOS/stop 条件。草稿 EOS 不会直接终止请求。`max_new_tokens` 包含首 Token；0 不运行模型，1 不进入 decode pipeline。`max_rows` 是资源边界，越界会报错，不是正常停止阈值。
+
+例如 `S=4、K=1`、prefill 后再生成 5 个 Token 且 q1 全接受：官方 `accept_len=4`，实际 commit 在 cycle 4、5、6、7、8；有限序列循环步数比为 `20/8=2.5`，并非一次提交 4 个 Token。该时间线已用官方纯 Python 调度器加模拟决策验证，未运行 GPU benchmark。
+
 ## LoopSpec 代码参考
 
-- [模型组件](https://github.com/kaist-flexml-lab/loopspec/tree/main/sglang_recurrent/modeling)
-- [LoopSpec pipeline](https://github.com/kaist-flexml-lab/loopspec/tree/main/sglang_recurrent/loopspec)
-- [分支与 KV 时间线](https://github.com/kaist-flexml-lab/loopspec/tree/main/sglang_recurrent/loopspec/branching)
-- [服务调度器](https://github.com/kaist-flexml-lab/loopspec/tree/main/sglang_recurrent/server)
+- [模型组件](https://github.com/kaist-flexml-lab/loopspec/tree/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/modeling)
+- [LoopSpec pipeline](https://github.com/kaist-flexml-lab/loopspec/tree/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec)
+- [分支与 KV 时间线](https://github.com/kaist-flexml-lab/loopspec/tree/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/loopspec/branching)
+- [服务调度器](https://github.com/kaist-flexml-lab/loopspec/tree/41aa710ed7c9ce908cffa03597be5d1df19d7b56/sglang_recurrent/server)
 
 ## 参考资料
 
@@ -386,4 +400,4 @@ LoopSpec 的负载处理可以分成三层。
 
 ## 证据边界
 
-本文使用了 Z.ai 官方博客和本仓库已有 LoopFill 分析作为主要依据。Z.ai 尚未公开完整的 GLM-5.4 推理接口、候选树 API、分支索引语义或 LoopFill 组合实验，因此文中涉及分支索引策略、缓存布局和性能上限的部分属于工程推导，实施前需要以实际权重和推理运行时的 profiling 结果校正。
+第 1—7 节使用 Z.ai 官方博客和本仓库已有 LoopFill 分析作为主要依据。Z.ai 尚未公开完整的 GLM-5.4 推理接口、候选树 API、分支索引语义或 LoopFill 组合实验，因此这些章节涉及的分支索引策略、缓存布局和性能上限属于工程推导，实施前需要以实际权重和推理运行时的 profiling 结果校正。第 8—9 节依据固定提交的 LoopSpec 源码与 SGLang 0.5.14，调度时间线和报表公式进行了 CPU 模拟验证；未进行 GPU 性能实测。

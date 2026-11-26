@@ -173,6 +173,8 @@ R1 首先猜出 `France`，并立即启动 `Prompt＋France` 分支。R2 对 `Fr
 
 **局限**：每次原生预测主要推进一个 Token；更早但不可靠的第一提案会制造无效分支，错误草稿仍会造成流水线气泡。
 
+实现与指标补充：官方源码的一个 pipeline cycle 最多提交一个 Token；报表 `accept_len` 是由 q1/q2 接受和回退频数推算的等效长度，不是单次提交长度。详细公式、有限序列启动开销和请求停止条件见 [LoopSpec 实验洞察](loopspec-code-insights.md)。
+
 ---
 
 ## 4. LoopAhead：学习型多 Token 草稿与反馈调度

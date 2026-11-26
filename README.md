@@ -12,6 +12,8 @@
 
 **[中文分析报告：Looped Transformer 投机解码方法分析](reports/looped-transformer-decoding-analysis.md)**
 
+**[LoopSpec 实验洞察：接受长度、投机步数与停止条件](reports/loopspec-code-insights.md)**：按固定版本源码解释 `accept_len` 公式、逐 cycle 提交、分支复用及 EOS/预算停止，并区分等效长度与实测加速。
+
 **[单页洞察 PPT：LoopFill 投机推理流程](reports/loopfill-speculative-decoding.html)**
 
 LoopFill 单篇导读：
